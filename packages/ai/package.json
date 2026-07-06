@@ -1,0 +1,31 @@
+{
+  "name": "@docflow/ai",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch",
+    "clean": "rimraf dist tsconfig.tsbuildinfo",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@docflow/shared": "workspace:*",
+    "groq-sdk": "^0.5.0",
+    "@google/generative-ai": "^0.15.0",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "rimraf": "^5.0.7",
+    "typescript": "^5.5.2",
+    "vitest": "^1.6.0"
+  }
+}

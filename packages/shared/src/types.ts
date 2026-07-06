@@ -1,0 +1,240 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// DocFlow AI — Shared Types & Interfaces
+// This is the canonical type layer shared across all packages.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─── AI Provider ─────────────────────────────────────────────────────────────
+
+export type AIProvider = "groq" | "gemini" | "ollama";
+
+// ─── Parser Output: Structured Facts ─────────────────────────────────────────
+
+/**
+ * A detected API route from the codebase.
+ */
+export interface ParsedRoute {
+  method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE" | "ANY";
+  path: string;
+  file: string;
+  line?: number;
+  /** Auth requirements detected (e.g. "JWT", "OAuth", "API Key") */
+  auth?: string;
+  /** Short description inferred from surrounding code / JSDoc */
+  description?: string;
+}
+
+/**
+ * A detected environment variable.
+ */
+export interface EnvVar {
+  name: string;
+  /** Whether the name pattern suggests a secret (TOKEN, SECRET, KEY, PASSWORD) */
+  isSensitive: boolean;
+  /** Files where this env var is referenced */
+  usedIn: string[];
+  /** Example value or format hint */
+  example?: string;
+}
+
+/**
+ * A detected database connection.
+ */
+export interface DatabaseInfo {
+  type: "postgres" | "mysql" | "sqlite" | "mongodb" | "redis" | "unknown";
+  orm?: "prisma" | "typeorm" | "sequelize" | "mongoose" | "drizzle" | "none";
+  /** Schema file path if detected */
+  schemaFile?: string;
+}
+
+/**
+ * A detected authentication mechanism.
+ */
+export interface AuthInfo {
+  type: string; // e.g. "JWT", "OAuth", "Session", "API Key"
+  library: string; // e.g. "jsonwebtoken", "next-auth", "passport"
+}
+
+/**
+ * Detected infrastructure / CI configuration.
+ */
+export interface InfraInfo {
+  docker: boolean;
+  dockerCompose: boolean;
+  ci: Array<"github-actions" | "gitlab-ci" | "circleci" | "travis">;
+  platforms: Array<"vercel" | "netlify" | "fly" | "railway" | "render">;
+}
+
+/**
+ * Detected language/framework in the project.
+ */
+export interface TechStackEntry {
+  language: "javascript" | "typescript" | "python" | "java" | "go" | "rust" | "unknown";
+  framework?: string; // e.g. "express", "nextjs", "fastapi", "spring-boot"
+  version?: string;
+}
+
+/**
+ * For monorepos: facts scoped to a single workspace/package.
+ */
+export interface WorkspaceFacts {
+  name: string;
+  path: string; // relative path within repo
+  stack: TechStackEntry[];
+  routes: ParsedRoute[];
+  databases: DatabaseInfo[];
+  auth: AuthInfo[];
+  envVars: EnvVar[];
+  infra: InfraInfo;
+}
+
+/**
+ * The canonical structured JSON that the Parser produces and the AI consumes.
+ * RAW SOURCE CODE MUST NEVER APPEAR IN THIS STRUCT.
+ */
+export interface RepoFacts {
+  /** Repository full name, e.g. "owner/repo" */
+  repoFullName: string;
+  /** Branch that was analyzed */
+  branch: string;
+  /** Git commit SHA at analysis time */
+  commitSha: string;
+  /** ISO timestamp of analysis */
+  analyzedAt: string;
+
+  // ── Top-level facts (for non-monorepos) ──
+  stack: TechStackEntry[];
+  routes: ParsedRoute[];
+  databases: DatabaseInfo[];
+  auth: AuthInfo[];
+  envVars: EnvVar[];
+  infra: InfraInfo;
+
+  /** Detected folder structure (first 3 levels, no file contents) */
+  folderStructure: FolderNode[];
+
+  /** Install command(s) detected from lock files / manifests */
+  installCommands: string[];
+
+  /** Start/dev commands detected */
+  devCommands: string[];
+
+  /** Build commands detected */
+  buildCommands: string[];
+
+  /** For monorepos: per-workspace facts */
+  workspaces?: WorkspaceFacts[];
+
+  /** Whether the repo appears to be a monorepo */
+  isMonorepo: boolean;
+}
+
+export interface FolderNode {
+  name: string;
+  type: "file" | "dir";
+  children?: FolderNode[];
+}
+
+// ─── Job / Queue Types ────────────────────────────────────────────────────────
+
+export type JobStatus =
+  | "pending"
+  | "active"
+  | "completed"
+  | "failed"
+  | "skipped";
+
+export interface AnalysisJobPayload {
+  /** Database AnalysisJob ID */
+  jobId: string;
+  /** GitHub webhook delivery ID for idempotency */
+  webhookDeliveryId: string;
+  /** Repository DB id */
+  repositoryId: string;
+  /** GitHub App installation ID */
+  installationId: number;
+  /** Repository full name: "owner/repo" */
+  repoFullName: string;
+  /** Branch that was pushed to */
+  branch: string;
+  /** Commit SHA before the push */
+  beforeSha: string;
+  /** Commit SHA after the push (HEAD) */
+  afterSha: string;
+  /** Files changed in this push (from webhook payload) */
+  changedFiles: string[];
+}
+
+// ─── AI Output Types ──────────────────────────────────────────────────────────
+
+export interface DocSection {
+  /** Heading text that maps to the README section */
+  heading: string;
+  /** Generated markdown content for this section */
+  content: string;
+}
+
+export interface GeneratedDocs {
+  /** All generated sections */
+  sections: DocSection[];
+  /** Raw full markdown (for new READMEs) */
+  fullMarkdown: string;
+  /** Whether this was generated by the deterministic fallback */
+  usedFallback: boolean;
+  /** Which AI provider was used (if not fallback) */
+  provider?: AIProvider;
+}
+
+// ─── Webhook Event Types ──────────────────────────────────────────────────────
+
+export interface PushEventPayload {
+  ref: string;
+  before: string;
+  after: string;
+  repository: {
+    id: number;
+    full_name: string;
+    default_branch: string;
+  };
+  installation?: {
+    id: number;
+  };
+  commits: Array<{
+    id: string;
+    added: string[];
+    removed: string[];
+    modified: string[];
+  }>;
+  head_commit: {
+    id: string;
+    message: string;
+  } | null;
+}
+
+// ─── API Response Types ───────────────────────────────────────────────────────
+
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface RepoSummary {
+  id: string;
+  fullName: string;
+  trackedBranch: string;
+  enabled: boolean;
+  lastJobStatus?: JobStatus;
+  lastJobAt?: string;
+  prUrl?: string;
+  docsGenerated: number;
+}
+
+export interface JobHistoryEntry {
+  id: string;
+  status: JobStatus;
+  commitSha: string;
+  prUrl?: string;
+  createdAt: string;
+  completedAt?: string;
+  errorMessage?: string;
+}

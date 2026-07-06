@@ -1,0 +1,28 @@
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+build/
+.next/
+out/
+.turbo/
+*.tsbuildinfo
+coverage/
+.nyc_output/
+/tmp/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+.vscode/
+*.swp
+*.swo
+
+# Never commit actual secrets
+**/.env
+**/.env.production
+**/.env.staging
+
+# Repo clones (created by worker)
+/clones/

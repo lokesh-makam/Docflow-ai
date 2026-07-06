@@ -1,0 +1,35 @@
+{
+  "name": "@docflow/worker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rimraf dist tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@docflow/ai": "workspace:*",
+    "@docflow/database": "workspace:*",
+    "@docflow/github": "workspace:*",
+    "@docflow/parser": "workspace:*",
+    "@docflow/queue": "workspace:*",
+    "@docflow/shared": "workspace:*",
+    "mdast-util-from-markdown": "^2.0.1",
+    "mdast-util-to-markdown": "^2.1.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "rimraf": "^5.0.7",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.2"
+  }
+}
