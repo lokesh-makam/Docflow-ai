@@ -2,7 +2,6 @@
 
 > **Automated Repository Documentation & Intelligence Platform** — the "Vercel for Documentation" that analyzes your codebase architecture and generates professional, senior-engineer quality README files using local or hosted AI models.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg)](https://pnpm.io/)
 
 ---
@@ -36,18 +35,20 @@ OAuth Log In → Select Repository → Trigger Analysis (Shallow Clone)
 
 ## 📂 Project Structure
 
+Navigating the monorepo is straightforward. Code is separated into logical workspaces managed by `pnpm`:
+
 ```
 docflow-ai/
 ├── apps/
 │   └── web/               # Next.js SaaS Web App (Dashboard, Editor, API Routes)
 ├── packages/
-│   ├── shared/            # Common TypeScript interfaces & utilities
-│   ├── database/          # Prisma schema + PostgreSQL Client
-│   ├── parser/            # AST/regex codebase fact extractor (no AI)
+│   ├── shared/            # Common TypeScript interfaces, crypto utilities & type definitions
+│   ├── database/          # Prisma schema + PostgreSQL Client & Migrations
+│   ├── parser/            # AST/regex codebase fact extractor (no AI, zero network calls)
 │   ├── ai/                # Provider-agnostic LLM integration & prompt generator
-│   └── queue/             # BullMQ + Redis job queue definitions
-├── docker-compose.yml     # Local Postgres + Redis services
-├── turbo.json             # Turborepo task pipeline
+│   └── queue/             # BullMQ + Redis job queue definitions & worker instantiation
+├── docker-compose.yml     # Local Postgres + Redis services configuration
+├── turbo.json             # Turborepo task pipeline configuration
 └── pnpm-workspace.yaml
 ```
 
@@ -57,15 +58,15 @@ docflow-ai/
 
 ### Prerequisites
 
-- Node.js ≥ 20
-- pnpm ≥ 9
-- Docker & Docker Compose (for local Postgres + Redis)
+- **Node.js** ≥ 20
+- **pnpm** ≥ 9 (`npm install -g pnpm`)
+- **Docker & Docker Compose** (for running local PostgreSQL and Redis)
 
 ### 1. Clone & Install
 
 ```bash
-git clone https://github.com/your-org/docflow-ai.git
-cd docflow-ai
+git clone https://github.com/lokesh-makam/Docflow-ai.git
+cd Docflow-ai
 pnpm install
 ```
 
@@ -82,7 +83,7 @@ And configure:
 - `ENCRYPTION_KEY` — 32-byte hex key for securing GitHub OAuth tokens (AES-256-GCM).
 - `GITHUB_CLIENT_ID` & `GITHUB_CLIENT_SECRET` — From your GitHub OAuth application.
 - `NEXTAUTH_SECRET` & `NEXTAUTH_URL` — NextAuth credentials.
-- `AI_PROVIDER` — `ollama`, `groq`, or `gemini`.
+- `AI_PROVIDER` — Set to `ollama`, `groq`, or `gemini`.
 
 ### 3. Start Infrastructure
 
@@ -91,7 +92,7 @@ Spin up local Postgres and Redis databases:
 docker compose up -d
 ```
 
-Push the database schema:
+Push the database schema and synchronize migrations:
 ```bash
 pnpm --filter @docflow/database db:push
 ```
@@ -104,7 +105,38 @@ pnpm dev
 
 This starts:
 - **Next.js Web App**: http://localhost:3000
-- **BullMQ Background Worker**: Asynchronously executes clones and static analyses.
+- **BullMQ Background Worker**: Asynchronously executes repository cloning, code parsing, and AI generation tasks.
+
+---
+
+## 🧭 Step-by-Step Developer Guide
+
+### 1. Sign In & Authentication Flow
+- Launch the application and click **Continue with GitHub**.
+- The authentication is powered by **NextAuth.js**. Once authorized, the access token is encrypted via **AES-256-GCM** using the `ENCRYPTION_KEY` and saved securely in the database.
+- The user session JWT does not store the token, eliminating client-side token exposure.
+
+### 2. The Repository Dashboard
+- Upon signing in, the frontend queries `/api/repos`, which decrypts your GitHub token server-side and pulls your authorized repositories.
+- You can filter, search, and page through public and private repositories using skeleton-loaded UI lists.
+
+### 3. Triggering README Generation
+- Clicking **Generate README** launches an asynchronous job:
+  1. The API route creates an `AnalysisJob` row and queues the job in **Redis** via **BullMQ**.
+  2. The background worker pulls the job, decrypts your access token, and does a shallow clone (`--depth=1`) of the repository to a temporary directory.
+  3. The `@docflow/parser` package runs static code AST analysis (zero AI context exposure).
+  4. The `@docflow/ai` prompt engine packages these facts, sends them to your configured AI provider (e.g. local Ollama running `qwen2.5-coder:7b`), parses the response with a hybrid parser (JSON parsing with markdown fallback), and caches the generated README.
+
+### 4. Editing & Customizing
+- The generated README is loaded into a split-screen editor where you can edit the markdown and view changes in real-time.
+- Features include:
+  - **Undo/Redo History**: Undo and redo button state controls.
+  - **Draft Autosaving**: Uncommitted edits are automatically backed up to `localStorage` to avoid data loss.
+  - **Section Regeneration**: Use the AI side-panel to update or refine specific sections dynamically.
+
+### 5. Pushing Directly to GitHub
+- Open the **Push Settings** panel to choose whether you want to do a **Direct Commit** to the default branch or open a **Pull Request**.
+- Clicking submit fires a request to `/api/readme/push`, which retrieves the decrypted token server-side, leverages **Octokit**, and performs the direct commit or creates the PR.
 
 ---
 
@@ -124,9 +156,3 @@ This starts:
 ## 🛡 Security & Token Protection
 
 All user access tokens are encrypted using **AES-256-GCM** before being persisted in the database. Tokens are never exposed in the client-side session JWT; decryption only occurs on the secure backend during git operations (cloning, committing, and opening PRs).
-
----
-
-## 📝 License
-
-Distributed under the MIT License. See `LICENSE` for more information.
