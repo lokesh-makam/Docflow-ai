@@ -15,7 +15,7 @@
     "build": "tsc --build",
     "dev": "tsc --build --watch",
     "clean": "rimraf dist tsconfig.tsbuildinfo",
-    "test": "vitest run"
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@docflow/shared": "workspace:*",
