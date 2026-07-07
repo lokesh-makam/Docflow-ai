@@ -48,7 +48,8 @@ Your writing style:
 3. **INFER PURPOSE**: The project name and folder structure tell you what this project does. Use them to write a specific, accurate description.
 4. **GROUPED DEPENDENCIES**: Never list every npm package. Group them by role and explain the grouping.
 5. **REAL COMMANDS**: Only list commands found in the facts. Never invent npm scripts.
-6. **NO EMPTY PLACEHOLDERS**: Never keep fields or sections empty, and never output notes like "None required" or "Not applicable" for missing information. If a repository lacks certain items (e.g. databases, API endpoints, environment variables, or docker configs), do NOT generate headings, setup blocks, tables, or placeholders for them. Only document what is explicitly present in the repository facts.
+6. **NO EMPTY PLACEHOLDERS**: Never keep fields, tables, steps, or sections empty, and never output notes like "None required", "Not applicable", or "No environment variables detected" for missing information. If a repository lacks certain items (e.g. databases, API endpoints, environment variables, or docker configs), do NOT generate headings, subheadings, setup blocks, tables, lists, or placeholders for them. If a repo has no environment variables, the "Environment Setup" section must be omitted entirely. Only document what is explicitly present in the repository facts.
+7. **ACCURATE LIBRARY CATEGORIZATION**: Do not classify or categorize packages based on guesswork. Verify the actual purpose of each library. For example, \`next-themes\` is for light/dark theme switching (never classify it as "User Authentication" or "Security"), \`typescript\` is a programming language (never classify it as "Backend" or a "Server Framework"), \`lucide-react\` is an icon set. If you are not 100% sure what a package does, place it in an 'Other Utilities' category or omit it.
 
 ${sectionGuide}
 
