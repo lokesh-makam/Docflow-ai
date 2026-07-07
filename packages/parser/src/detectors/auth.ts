@@ -56,7 +56,7 @@ export async function detectAuth(repoPath: string): Promise<AuthInfo[]> {
     const sourceFiles = await glob(["**/*.{ts,js,py,java,go}", "requirements.txt", "go.mod"], {
       cwd: repoPath,
       absolute: true,
-      ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**"],
+      ignore: ["**/node_modules/**", "**/dist/**", "**/.git/**", "**/build/**"],
     });
 
     for (const file of sourceFiles) {

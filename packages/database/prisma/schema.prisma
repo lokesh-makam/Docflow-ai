@@ -1,9 +1,8 @@
-// This is your Prisma schema file.
-// Learn more about it: https://pris.ly/d/prisma-schema
+// DocFlow AI — Database Schema
+// Production-grade relational design
 
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -11,154 +10,99 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// USER — GitHub OAuth authenticated user
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Core Models ─────────────────────────────────────────────────────────────
 
 model User {
-  id            String   @id @default(cuid())
-  githubId      Int      @unique
-  username      String
-  displayName   String?
-  avatarUrl     String?
-  email         String?
-  accessToken   String   // GitHub OAuth access token (encrypted at rest)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String       @id @default(cuid())
+  githubId     Int          @unique
+  username     String
+  displayName  String?
+  avatarUrl    String?
+  email        String?
+  accessToken  String       // AES-256-GCM encrypted GitHub OAuth token
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
-  installations Installation[]
-  sessions      Session[]
+  repositories Repository[]
 
   @@map("users")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// SESSION — NextAuth.js session (database adapter)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model Session {
-  id           String   @id @default(cuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// INSTALLATION — GitHub App installation (org or user account)
-// ─────────────────────────────────────────────────────────────────────────────
-
-model Installation {
-  id                   String   @id @default(cuid())
-  githubInstallationId Int      @unique
-  accountLogin         String   // GitHub username or org name
-  accountType          String   // "User" | "Organization"
-  appId                Int
-  targetType           String   // "User" | "Organization"
-  suspended            Boolean  @default(false)
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  userId String?
-  user   User?   @relation(fields: [userId], references: [id])
-
-  repositories Repository[]
-
-  @@map("installations")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// REPOSITORY — A repo with DocFlow AI enabled
-// ─────────────────────────────────────────────────────────────────────────────
-
 model Repository {
-  id             String   @id @default(cuid())
-  githubRepoId   Int      @unique
-  fullName       String   // "owner/repo"
-  defaultBranch  String   @default("main")
-  trackedBranch  String   @default("main")
-  enabled        Boolean  @default(true)
+  id            String   @id @default(cuid())
+  githubRepoId  Int      @unique
+  fullName      String   // "owner/repo"
+  name          String   @default("")
+  owner         String   @default("")
+  defaultBranch String   @default("main")
+  trackedBranch String   @default("main")
+  isPrivate     Boolean  @default(false)
+  language      String?
+  description   String?
+  stars         Int      @default(0)
+  docStyle      String   @default("standard")
+  aiProvider    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  // Doc generation settings
-  docStyle       String   @default("standard") // "standard" | "minimal" | "detailed"
-  aiProvider     String?  // Override per-repo AI provider (null = use global default)
-  customSections Json?    // User-defined sections to preserve / skip
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // Monorepo settings
-  isMonorepo     Boolean  @default(false)
-  monorepoRoots  String[] // e.g. ["apps/api", "apps/web"]
+  jobs        AnalysisJob[]
+  cachedFacts CachedFacts?
+  draft       ReadmeDraft?
 
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-
-  installationId String
-  installation   Installation @relation(fields: [installationId], references: [id])
-
-  jobs           AnalysisJob[]
-  cachedFacts    CachedFacts?
-
+  @@index([userId])
   @@map("repositories")
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ANALYSIS JOB — One run of the documentation pipeline
-// ─────────────────────────────────────────────────────────────────────────────
-
 model AnalysisJob {
-  id                String    @id @default(cuid())
-  status            JobStatus @default(PENDING)
-
-  // Idempotency — unique per GitHub webhook delivery
-  webhookDeliveryId String    @unique
-  commitSha         String
-  beforeSha         String
-  branch            String
-  changedFiles      String[]
-
-  // Results
-  prUrl             String?
-  prNumber          Int?
-  docsChangedCount  Int?     // How many sections were updated
-  usedFallback      Boolean  @default(false)
-  errorMessage      String?
-
-  createdAt         DateTime @default(now())
-  startedAt         DateTime?
-  completedAt       DateTime?
+  id           String    @id @default(cuid())
+  status       JobStatus @default(PENDING)
+  commitSha    String
+  branch       String
+  errorMessage String?
+  usedFallback Boolean   @default(false)
+  sectionsCount Int?
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
 
   repositoryId String
-  repository   Repository @relation(fields: [repositoryId], references: [id])
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
 
-  @@index([repositoryId, createdAt(sort: Desc)])
-  @@index([status])
+  @@index([repositoryId])
   @@map("analysis_jobs")
 }
+
+model CachedFacts {
+  id              String   @id @default(cuid())
+  factJson        Json     // Structured RepoFacts (no raw source code)
+  generatedReadme String?  // Full generated README markdown for fast retrieval
+  commitSha       String
+  updatedAt       DateTime @updatedAt
+
+  repositoryId String     @unique
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@map("cached_facts")
+}
+
+model ReadmeDraft {
+  id        String   @id @default(cuid())
+  content   String   // Current working draft
+  updatedAt DateTime @updatedAt
+
+  repositoryId String     @unique
+  repository   Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@map("readme_drafts")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
 
 enum JobStatus {
   PENDING
   ACTIVE
   COMPLETED
   FAILED
-  SKIPPED
-
-  @@map("job_status")
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// CACHED FACTS — Rolling merged RepoFacts JSON per repository
-// ─────────────────────────────────────────────────────────────────────────────
-
-model CachedFacts {
-  id           String   @id @default(cuid())
-  factJson     Json     // The full RepoFacts object
-  commitSha    String   // The commit SHA this cache was generated from
-  updatedAt    DateTime @updatedAt
-
-  repositoryId String     @unique
-  repository   Repository @relation(fields: [repositoryId], references: [id])
-
-  @@map("cached_facts")
 }

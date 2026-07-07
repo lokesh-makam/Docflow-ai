@@ -4,6 +4,7 @@
   "private": true,
   "description": "DocFlow AI — Automated Repository Documentation & Intelligence Platform",
   "scripts": {
+    "predev": "turbo run build --filter=!@docflow/web",
     "dev": "turbo run dev --parallel",
     "build": "turbo run build",
     "test": "turbo run test",
@@ -11,8 +12,11 @@
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\"",
     "db:generate": "pnpm -F @docflow/database db:generate",
     "db:migrate": "pnpm -F @docflow/database db:migrate",
+    "db:migrate:dev": "pnpm -F @docflow/database db:migrate:dev",
     "db:studio": "pnpm -F @docflow/database db:studio",
-    "clean": "turbo run clean && rimraf node_modules"
+    "clean": "turbo run clean && rimraf node_modules",
+    "infra:up": "docker compose up -d",
+    "infra:down": "docker compose down"
   },
   "devDependencies": {
     "@types/node": "^20.14.0",

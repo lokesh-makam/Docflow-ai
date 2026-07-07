@@ -1,8 +1,5 @@
 import type { RepoFacts, GeneratedDocs, AIProvider } from "@docflow/shared";
 import { sanitizeFacts } from "@docflow/shared";
-import { GroqProvider } from "./providers/groq.js";
-import { GeminiProvider } from "./providers/gemini.js";
-import { OllamaProvider } from "./providers/ollama.js";
 import { generateFallbackDocs } from "./fallback.js";
 
 export interface AIModuleOptions {
@@ -34,22 +31,43 @@ export async function generateDocs(
     (process.env.AI_PROVIDER as AIProvider) ??
     "groq";
 
+  // Check if we have a valid API key before trying provider
+  const hasGroqKey = !!process.env.GROQ_API_KEY;
+  const hasGeminiKey = !!(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.length > 10);
+
+  if (providerName === "groq" && !hasGroqKey) {
+    console.warn("[DocFlow AI] No valid GROQ_API_KEY — using deterministic fallback");
+    return generateFallbackDocs(safeFacts);
+  }
+  if (providerName === "gemini" && !hasGeminiKey) {
+    console.warn("[DocFlow AI] No valid GEMINI_API_KEY — using deterministic fallback");
+    return generateFallbackDocs(safeFacts);
+  }
+
   try {
+    let provider;
     switch (providerName) {
       case "groq":
-        return await new GroqProvider().generate(safeFacts);
+        { const { GroqProvider } = await import("./providers/groq.js");
+        provider = new GroqProvider();
+        break; }
       case "gemini":
-        return await new GeminiProvider().generate(safeFacts);
+        { const { GeminiProvider } = await import("./providers/gemini.js");
+        provider = new GeminiProvider();
+        break; }
       case "ollama":
-        return await new OllamaProvider().generate(safeFacts);
+        { const { OllamaProvider } = await import("./providers/ollama.js");
+        provider = new OllamaProvider();
+        break; }
       default:
-        console.warn(`[DocFlow AI] Unknown provider "${providerName}", falling back to deterministic template`);
+        console.warn(`[DocFlow AI] Unknown provider "${providerName}", using fallback`);
         return generateFallbackDocs(safeFacts);
     }
+    return await provider.generate(safeFacts);
   } catch (err) {
     const error = err as Error;
     console.warn(
-      `[DocFlow AI] AI provider "${providerName}" failed: ${error.message}. Using deterministic fallback.`
+      `[DocFlow AI] Provider "${providerName}" failed: ${error.message}. Using deterministic fallback.`
     );
     return generateFallbackDocs(safeFacts);
   }
@@ -57,4 +75,3 @@ export async function generateDocs(
 
 export { generateFallbackDocs } from "./fallback.js";
 export { validateGeneratedDocs } from "./validator.js";
-export type { AIModuleOptions };

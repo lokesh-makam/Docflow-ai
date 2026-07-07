@@ -7,28 +7,27 @@
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
+    },
+    "./git": {
+      "import": "./dist/git.js",
+      "types": "./dist/git.d.ts"
     }
   },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc --build",
-    "dev": "tsx watch src/app.ts",
-    "start": "node dist/app.js",
     "clean": "rimraf dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
     "@docflow/database": "workspace:*",
     "@docflow/queue": "workspace:*",
     "@docflow/shared": "workspace:*",
-    "probot": "^13.3.8",
     "simple-git": "^3.25.0",
-    "@octokit/rest": "^21.0.0",
-    "@octokit/auth-app": "^7.1.1"
+    "@octokit/rest": "^21.0.0"
   },
   "devDependencies": {
     "rimraf": "^5.0.7",
-    "tsx": "^4.16.2",
     "typescript": "^5.5.2"
   }
 }

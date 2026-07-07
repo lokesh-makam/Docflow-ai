@@ -2,7 +2,7 @@ import type { RepoFacts, GeneratedDocs } from "@docflow/shared";
 import { buildPrompt } from "../prompts/index.js";
 import { parseAIResponse } from "../response-parser.js";
 
-const DEFAULT_BASE_URL = "http://localhost:11434";
+const DEFAULT_BASE_URL = "http://127.0.0.1:11434";
 const DEFAULT_MODEL = "qwen2.5-coder:7b";
 
 export class OllamaProvider {
@@ -26,6 +26,7 @@ export class OllamaProvider {
         options: {
           temperature: 0.3,
           num_predict: 4096,
+          num_ctx: 8192,
         },
         messages: [
           { role: "system", content: systemPrompt },

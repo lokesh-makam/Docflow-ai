@@ -93,6 +93,8 @@ export async function analyzeRepo(
     );
   }
 
+  const manifest = extractManifestDetails(repoPath);
+
   const facts: RepoFacts = {
     repoFullName,
     branch,
@@ -110,6 +112,7 @@ export async function analyzeRepo(
     buildCommands: commands.build,
     isMonorepo: monorepoInfo.isMonorepo,
     workspaces,
+    ...manifest,
   };
 
   return facts;
@@ -125,14 +128,16 @@ async function analyzeWorkspace(
   const fullPath = path.join(repoRoot, workspacePath);
   const name = path.basename(workspacePath);
 
-  const [stack, routes, databases, auth, envVars, infra] = await Promise.all([
-    detectTechStack(fullPath),
-    detectRoutes(fullPath, [], undefined),
+  const stack = await detectTechStack(fullPath);
+  const [routes, databases, auth, envVars, infra] = await Promise.all([
+    detectRoutes(fullPath, stack, undefined),
     detectDatabases(fullPath),
     detectAuth(fullPath),
     detectEnvVars(fullPath),
     detectInfra(fullPath),
   ]);
+
+  const manifest = extractManifestDetails(fullPath);
 
   return {
     name,
@@ -143,6 +148,7 @@ async function analyzeWorkspace(
     auth,
     envVars,
     infra,
+    ...manifest,
   };
 }
 
@@ -187,6 +193,49 @@ function deduplicateByName<T extends { name: string }>(items: T[]): T[] {
     seen.add(item.name);
     return true;
   });
+}
+
+function extractManifestDetails(projectPath: string) {
+  const details: {
+    packageManager?: string;
+    packageScripts?: Record<string, string>;
+    dependencies?: Record<string, string>;
+    devDependencies?: Record<string, string>;
+  } = {};
+
+  const pkgPath = path.join(projectPath, "package.json");
+  if (fs.existsSync(pkgPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
+      details.packageScripts = pkg.scripts || undefined;
+      details.dependencies = pkg.dependencies || undefined;
+      details.devDependencies = pkg.devDependencies || undefined;
+
+      if (fs.existsSync(path.join(projectPath, "bun.lockb"))) {
+        details.packageManager = "bun";
+      } else if (fs.existsSync(path.join(projectPath, "pnpm-lock.yaml"))) {
+        details.packageManager = "pnpm";
+      } else if (fs.existsSync(path.join(projectPath, "yarn.lock"))) {
+        details.packageManager = "yarn";
+      } else {
+        details.packageManager = "npm";
+      }
+    } catch {
+      // ignore
+    }
+  } else if (fs.existsSync(path.join(projectPath, "go.mod"))) {
+    details.packageManager = "go";
+  } else if (fs.existsSync(path.join(projectPath, "Cargo.toml"))) {
+    details.packageManager = "cargo";
+  } else if (fs.existsSync(path.join(projectPath, "requirements.txt")) || fs.existsSync(path.join(projectPath, "pyproject.toml"))) {
+    details.packageManager = "pip";
+  } else if (fs.existsSync(path.join(projectPath, "pom.xml"))) {
+    details.packageManager = "maven";
+  } else if (fs.existsSync(path.join(projectPath, "build.gradle")) || fs.existsSync(path.join(projectPath, "build.gradle.kts"))) {
+    details.packageManager = "gradle";
+  }
+
+  return details;
 }
 
 export { detectTechStack } from "./detectors/tech-stack.js";

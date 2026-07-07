@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 224 71% 4%;
+    --foreground: 213 31% 91%;
+    --card: 224 71% 4%;
+    --card-foreground: 213 31% 91%;
+    --popover: 224 71% 4%;
+    --popover-foreground: 213 31% 91%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 1.2%;
+    --secondary: 222.2 47.4% 11.2%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 223 47% 11%;
+    --muted-foreground: 215.4 16.3% 56.9%;
+    --accent: 216 34% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 63% 31%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 216 34% 17%;
+    --input: 216 34% 17%;
+    --ring: 263.4 70% 50.4%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border box-border;
+  }
+  body {
+    @apply bg-[#0a0f1e] text-slate-100 antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* ─── Typography ─────────────────────────────────────────────────────────── */
+code, pre, kbd, samp {
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', ui-monospace, monospace;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(99, 102, 241, 0.3);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.5);
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────── */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-in {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0); }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out forwards;
+}
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out forwards;
+}
+
+/* ─── Skeleton Loading ───────────────────────────────────────────────────── */
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ─── Markdown Preview ───────────────────────────────────────────────────── */
+.markdown-preview {
+  line-height: 1.75;
+  color: #e2e8f0;
+}
+.markdown-preview h1 {
+  @apply text-3xl font-bold text-white border-b border-white/10 pb-3 mb-6 mt-8;
+}
+.markdown-preview h2 {
+  @apply text-2xl font-semibold text-white border-b border-white/10 pb-2 mb-4 mt-8;
+}
+.markdown-preview h3 {
+  @apply text-xl font-semibold text-slate-200 mb-3 mt-6;
+}
+.markdown-preview h4 {
+  @apply text-lg font-medium text-slate-300 mb-2 mt-4;
+}
+.markdown-preview p {
+  @apply text-slate-300 mb-4 leading-relaxed;
+}
+.markdown-preview a {
+  @apply text-indigo-400 hover:text-indigo-300 underline underline-offset-2;
+}
+.markdown-preview ul, .markdown-preview ol {
+  @apply text-slate-300 mb-4 pl-6;
+}
+.markdown-preview ul { @apply list-disc; }
+.markdown-preview ol { @apply list-decimal; }
+.markdown-preview li {
+  @apply mb-1;
+}
+.markdown-preview blockquote {
+  @apply border-l-4 border-indigo-500 pl-4 py-1 text-slate-400 italic mb-4;
+}
+.markdown-preview code {
+  @apply bg-slate-800 text-indigo-300 px-1.5 py-0.5 rounded text-sm font-mono;
+}
+.markdown-preview pre {
+  @apply bg-slate-900 border border-white/10 rounded-xl p-4 mb-4 overflow-x-auto;
+}
+.markdown-preview pre code {
+  @apply bg-transparent text-slate-300 p-0 text-sm;
+}
+.markdown-preview table {
+  @apply w-full border-collapse mb-4 text-sm;
+}
+.markdown-preview th {
+  @apply bg-slate-800 text-slate-200 font-semibold px-4 py-2 text-left border border-white/10;
+}
+.markdown-preview td {
+  @apply px-4 py-2 border border-white/10 text-slate-300;
+}
+.markdown-preview tr:nth-child(even) td {
+  @apply bg-white/[0.02];
+}
+.markdown-preview img {
+  @apply max-w-full rounded-lg;
+}
+.markdown-preview hr {
+  @apply border-white/10 my-6;
+}
+
+/* ─── Grid background ────────────────────────────────────────────────────── */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+  background-size: 64px 64px;
+}
+
+/* ─── Glass card ─────────────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ─── Gradient text ──────────────────────────────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1, #8b5cf6, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ─── Spinner ────────────────────────────────────────────────────────────── */
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid rgba(99, 102, 241, 0.2);
+  border-top-color: #6366f1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* ─── Editor ─────────────────────────────────────────────────────────────── */
+.editor-textarea {
+  resize: none;
+  outline: none;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px;
+  line-height: 1.7;
+  tab-size: 2;
+  caret-color: #6366f1;
+}
+.editor-textarea::selection {
+  background: rgba(99, 102, 241, 0.3);
+}

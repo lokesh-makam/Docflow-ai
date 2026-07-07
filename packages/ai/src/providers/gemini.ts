@@ -11,9 +11,9 @@ export class GeminiProvider {
 
   constructor() {
     const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    if (!apiKey || apiKey.length < 10) {
       throw new Error(
-        "[DocFlow AI] GEMINI_API_KEY is not set. " +
+        "[DocFlow AI] Invalid GEMINI_API_KEY. " +
         "Get a free key at https://aistudio.google.com"
       );
     }
@@ -30,6 +30,7 @@ export class GeminiProvider {
       generationConfig: {
         temperature: 0.3,
         maxOutputTokens: 4096,
+        responseMimeType: "application/json",
       },
     });
 

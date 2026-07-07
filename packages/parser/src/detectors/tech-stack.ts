@@ -19,6 +19,10 @@ const JS_FRAMEWORKS: Record<string, Omit<TechStackEntry, "language">> = {
   "@remix-run/node": { framework: "remix" },
   astro: { framework: "astro" },
   "react-router-dom": { framework: "react-router" },
+  react: { framework: "react" },
+  vue: { framework: "vue" },
+  svelte: { framework: "svelte" },
+  vite: { framework: "vite" },
 };
 
 const PYTHON_FRAMEWORKS: Record<string, string> = {

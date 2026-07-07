@@ -1,180 +1,112 @@
-import type { AnalysisJobPayload, RepoFacts } from "@docflow/shared";
-import { categorizeChangedFiles } from "@docflow/shared";
-import { analyzeRepo, mergeFacts } from "@docflow/parser";
+import type { AnalysisJobPayload } from "@docflow/shared";
+import { analyzeRepo } from "@docflow/parser";
 import { generateDocs } from "@docflow/ai";
-import { validateGeneratedDocs } from "@docflow/ai";
-import { cloneRepo, commitAndOpenPR } from "@docflow/github/git";
+import { cloneRepo } from "@docflow/github";
 import { db } from "@docflow/database";
-import { patchReadme } from "./readme-patcher.js";
+import { decrypt } from "@docflow/shared";
+import { simpleGit } from "simple-git";
 
 export interface PipelineResult {
   success: boolean;
-  prUrl?: string;
-  prNumber?: number;
   usedFallback?: boolean;
-  sectionsUpdated?: number;
+  sectionsCount?: number;
   error?: string;
 }
 
 /**
- * The full documentation generation pipeline.
+ * The core DocFlow AI documentation generation pipeline.
  *
  * Steps:
- * 1. Shallow-clone the repository
- * 2. Load cached facts (if any)
- * 3. Determine which detectors to run (diff-only or full)
- * 4. Run the Parser Engine (zero AI)
- * 5. Merge new facts with cached facts
- * 6. Update the fact cache in the database
- * 7. Generate documentation via AI (or fallback)
- * 8. Validate generated markdown
- * 9. Apply surgical section-level patches to existing READMEs
- * 10. Commit and open PR
- * 11. Update job status
+ * 1. Fetch user token from DB (decrypted)
+ * 2. Shallow clone the repository
+ * 3. Run static parser analysis (zero AI, zero network)
+ * 4. Generate README via AI (LLM uses only structured facts)
+ * 5. Persist generated README and cached facts to DB
+ * 6. Mark job complete
  */
 export async function runPipeline(payload: AnalysisJobPayload): Promise<PipelineResult> {
-  const {
-    jobId,
-    repositoryId,
-    installationId,
-    repoFullName,
-    branch,
-    afterSha,
-    beforeSha,
-    changedFiles,
-  } = payload;
+  const { jobId, repositoryId, userId, repoFullName, branch } = payload;
 
-  // ── Update job status to ACTIVE ────────────────────────────────────────────
   await db.analysisJob.update({
     where: { id: jobId },
-    data: { status: "ACTIVE", startedAt: new Date() },
+    data: { status: "ACTIVE" },
   });
 
   let cleanup: (() => Promise<void>) | undefined;
 
   try {
-    // ── Step 1: Shallow clone ──────────────────────────────────────────────────
-    console.log(`[pipeline] Cloning ${repoFullName}@${branch}...`);
-    const { localPath, cleanup: _cleanup } = await cloneRepo(
-      repoFullName,
-      installationId,
-      branch
-    );
+    // ── Step 0: Fetch decrypted GitHub token ────────────────────────────────
+    const user = await db.user.findUnique({ where: { id: userId } });
+    if (!user?.accessToken) {
+      throw new Error(`User or access token not found for userId: ${userId}`);
+    }
+    const token = decrypt(user.accessToken);
+
+    // ── Step 1: Shallow clone ───────────────────────────────────────────────
+    console.log(`[pipeline] Cloning ${repoFullName}@${branch}…`);
+    const { localPath, cleanup: _cleanup } = await cloneRepo(repoFullName, token, branch);
     cleanup = _cleanup;
 
-    // ── Step 2: Load cached facts ──────────────────────────────────────────────
-    const cachedFactsRecord = await db.cachedFacts.findUnique({
-      where: { repositoryId },
-    });
-    const cachedFacts = cachedFactsRecord?.factJson as RepoFacts | null;
+    const git = simpleGit(localPath);
+    const commitSha = (await git.revparse(["HEAD"])).trim();
+    console.log(`[pipeline] Cloned at ${commitSha.slice(0, 8)}`);
 
-    // ── Step 3: Determine analysis scope ──────────────────────────────────────
-    const shouldRunFullAnalysis =
-      !cachedFacts ||
-      cachedFacts.commitSha === "0000000000000000000000000000000000000000";
-
-    const filesToAnalyze = shouldRunFullAnalysis ? undefined : changedFiles;
-
+    // ── Step 2: Static parser analysis ─────────────────────────────────────
+    console.log(`[pipeline] Running static parser analysis…`);
+    const facts = await analyzeRepo(localPath, { repoFullName, branch, commitSha });
     console.log(
-      `[pipeline] Running ${shouldRunFullAnalysis ? "FULL" : "DIFF-ONLY"} analysis` +
-      (filesToAnalyze ? ` on ${filesToAnalyze.length} changed files` : "")
+      `[pipeline] Parser: stack=${facts.stack.map((s) => s.language).join(",")}, ` +
+        `routes=${facts.routes.length}, envVars=${facts.envVars.length}, ` +
+        `isMonorepo=${facts.isMonorepo}`
     );
 
-    // ── Step 4: Run Parser Engine (zero AI) ────────────────────────────────────
-    const newFacts = await analyzeRepo(localPath, {
-      repoFullName,
-      branch,
-      commitSha: afterSha,
-      changedFiles: filesToAnalyze,
-    });
+    // ── Step 3: AI README generation ───────────────────────────────────────
+    console.log(`[pipeline] Generating README via AI…`);
+    const generatedDocs = await generateDocs(facts);
+    console.log(
+      `[pipeline] README generated via ${generatedDocs.usedFallback ? "deterministic fallback" : generatedDocs.provider} ` +
+        `(${generatedDocs.sections.length} sections, ${generatedDocs.fullMarkdown.length} chars)`
+    );
 
-    // ── Step 5: Merge facts ────────────────────────────────────────────────────
-    const mergedFacts = cachedFacts
-      ? mergeFacts(cachedFacts, newFacts, afterSha)
-      : newFacts;
+    // ── Step 4: Persist to database ─────────────────────────────────────────
+    // Store facts JSON (without the raw README to avoid duplication)
+    const factJson = { ...facts } as any;
 
-    // ── Step 6: Update fact cache ──────────────────────────────────────────────
     await db.cachedFacts.upsert({
       where: { repositoryId },
       create: {
         repositoryId,
-        factJson: mergedFacts as object,
-        commitSha: afterSha,
+        factJson,
+        generatedReadme: generatedDocs.fullMarkdown,
+        commitSha,
       },
       update: {
-        factJson: mergedFacts as object,
-        commitSha: afterSha,
+        factJson,
+        generatedReadme: generatedDocs.fullMarkdown,
+        commitSha,
       },
     });
 
-    // ── Step 7: Generate documentation ────────────────────────────────────────
-    console.log(`[pipeline] Generating documentation...`);
-    const generatedDocs = await generateDocs(mergedFacts);
-    console.log(
-      `[pipeline] Docs generated via ${generatedDocs.usedFallback ? "fallback template" : generatedDocs.provider}`
-    );
-
-    // ── Step 8: Validate generated markdown ───────────────────────────────────
-    const validation = await validateGeneratedDocs(generatedDocs);
-    if (!validation.isValid) {
-      console.warn(
-        `[pipeline] Markdown validation errors:\n${validation.errors.join("\n")}`
-      );
-      // Non-fatal: log and continue (better a slightly imperfect doc than no PR)
-    }
-    if (validation.warnings.length > 0) {
-      console.warn(`[pipeline] Markdown warnings:\n${validation.warnings.join("\n")}`);
-    }
-
-    // ── Step 9: Apply surgical README patches ──────────────────────────────────
-    console.log(`[pipeline] Patching README...`);
-    const { patchedContent, sectionsUpdated } = await patchReadme(
-      localPath,
-      generatedDocs
-    );
-
-    if (sectionsUpdated === 0) {
-      console.log(`[pipeline] No README sections changed, skipping PR`);
-      await db.analysisJob.update({
-        where: { id: jobId },
-        data: {
-          status: "COMPLETED",
-          completedAt: new Date(),
-          docsChangedCount: 0,
-          usedFallback: generatedDocs.usedFallback,
-        },
-      });
-      await cleanup();
-      return { success: true, sectionsUpdated: 0 };
-    }
-
-    // ── Step 10: Commit and open PR ────────────────────────────────────────────
-    console.log(`[pipeline] Opening PR with ${sectionsUpdated} updated section(s)...`);
-    const { prUrl, prNumber } = await commitAndOpenPR({
-      repoFullName,
-      installationId,
-      baseBranch: branch,
-      commitSha: afterSha,
-      patchedFiles: [{ path: "README.md", content: patchedContent }],
-    });
-
-    // ── Step 11: Mark job complete ─────────────────────────────────────────────
+    // ── Step 5: Mark job complete ────────────────────────────────────────────
     await db.analysisJob.update({
       where: { id: jobId },
       data: {
         status: "COMPLETED",
+        commitSha,
         completedAt: new Date(),
-        prUrl,
-        prNumber,
-        docsChangedCount: sectionsUpdated,
+        sectionsCount: generatedDocs.sections.length,
         usedFallback: generatedDocs.usedFallback,
       },
     });
 
-    console.log(`[pipeline] ✅ PR opened: ${prUrl}`);
+    console.log(`[pipeline] ✅ Done for ${repoFullName}`);
     await cleanup();
 
-    return { success: true, prUrl, prNumber, sectionsUpdated, usedFallback: generatedDocs.usedFallback };
+    return {
+      success: true,
+      usedFallback: generatedDocs.usedFallback,
+      sectionsCount: generatedDocs.sections.length,
+    };
   } catch (err) {
     const error = err as Error;
     console.error(`[pipeline] ❌ Failed: ${error.message}`, error);
@@ -184,11 +116,17 @@ export async function runPipeline(payload: AnalysisJobPayload): Promise<Pipeline
       data: {
         status: "FAILED",
         completedAt: new Date(),
-        errorMessage: error.message.slice(0, 1000),
+        errorMessage: error.message.slice(0, 2000),
       },
     });
 
-    if (cleanup) await cleanup();
+    if (cleanup) {
+      try {
+        await cleanup();
+      } catch (cleanupErr) {
+        console.error("[pipeline] Cleanup failed:", cleanupErr);
+      }
+    }
 
     return { success: false, error: error.message };
   }

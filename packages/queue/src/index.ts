@@ -1,6 +1,6 @@
 import { Queue, Worker, QueueEvents, type Processor } from "bullmq";
 import type { AnalysisJobPayload } from "@docflow/shared";
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 
 // ─── Redis Connection ─────────────────────────────────────────────────────────
 
@@ -39,8 +39,8 @@ export function getWorkerConnection(): Redis {
 // ─── Queue Names ──────────────────────────────────────────────────────────────
 
 export const QUEUE_NAMES = {
-  ANALYSIS: "docflow:analysis",
-  PR: "docflow:pr",
+  ANALYSIS: "docflow-analysis",
+  PR: "docflow-pr",
 } as const;
 
 // ─── Analysis Queue ───────────────────────────────────────────────────────────
@@ -50,7 +50,7 @@ let _analysisQueue: Queue<AnalysisJobPayload> | null = null;
 export function getAnalysisQueue(): Queue<AnalysisJobPayload> {
   if (!_analysisQueue) {
     _analysisQueue = new Queue<AnalysisJobPayload>(QUEUE_NAMES.ANALYSIS, {
-      connection: getQueueConnection(),
+      connection: getQueueConnection() as any,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
@@ -80,25 +80,18 @@ export async function enqueueAnalysisJob(
 ): Promise<string> {
   const queue = getAnalysisQueue();
 
-  // Use webhookDeliveryId as the job ID for deduplication
-  // BullMQ will silently drop if a job with this ID already exists
   const job = await queue.add(QUEUE_NAMES.ANALYSIS, payload, {
-    jobId: `delivery:${payload.webhookDeliveryId}`,
-    // Delay slightly to allow for webhook delivery batching
-    delay: 1000,
+    jobId: `job-${payload.jobId}`,
+    delay: 500,
   });
 
-  return job.id ?? payload.webhookDeliveryId;
+  return job.id ?? payload.jobId;
 }
 
 // ─── Worker Factory ───────────────────────────────────────────────────────────
 
 export interface WorkerOptions {
   concurrency?: number;
-  rateLimiter?: {
-    max: number;
-    duration: number;
-  };
 }
 
 /**
@@ -109,13 +102,10 @@ export function createAnalysisWorker(
   processor: Processor<AnalysisJobPayload>,
   options: WorkerOptions = {}
 ): Worker<AnalysisJobPayload> {
+  console.log("QUEUE NAME:", QUEUE_NAMES.ANALYSIS);
   return new Worker<AnalysisJobPayload>(QUEUE_NAMES.ANALYSIS, processor, {
-    connection: getWorkerConnection(),
+    connection: getWorkerConnection() as any,
     concurrency: options.concurrency ?? 2, // Conservative default for free tiers
-    rateLimiter: options.rateLimiter ?? {
-      max: 10,         // Max 10 jobs per duration
-      duration: 60000, // Per minute
-    },
     stalledInterval: 30000,
     maxStalledCount: 2,
   });
@@ -128,7 +118,7 @@ let _queueEvents: QueueEvents | null = null;
 export function getAnalysisQueueEvents(): QueueEvents {
   if (!_queueEvents) {
     _queueEvents = new QueueEvents(QUEUE_NAMES.ANALYSIS, {
-      connection: createRedisConnection(),
+      connection: createRedisConnection() as any,
     });
   }
   return _queueEvents;

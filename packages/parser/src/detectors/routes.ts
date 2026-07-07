@@ -270,16 +270,8 @@ async function discoverRouteFiles(
   const files = await glob(patterns, {
     cwd: repoPath,
     absolute: true,
-    ignore: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/.git/**",
-      "**/vendor/**",
-      "**/__pycache__/**",
-      "**/*.test.{ts,js,py}",
-      "**/*.spec.{ts,js}",
-    ],
+    nodir: true,
+    ignore: ["**/node_modules/**", "**/.git/**", "**/dist/**", "**/build/**", "**/*.test.*", "**/*.spec.*"],
   });
 
   return files;

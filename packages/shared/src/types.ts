@@ -36,6 +36,33 @@ export interface EnvVar {
   example?: string;
 }
 
+export interface PrismaModelField {
+  name: string;
+  type: string;
+  isId: boolean;
+  isUnique: boolean;
+  relation?: {
+    fields?: string[];
+    references?: string[];
+    to: string;
+  };
+}
+
+export interface PrismaModel {
+  name: string;
+  fields: PrismaModelField[];
+}
+
+export interface PrismaSchemaInfo {
+  models: PrismaModel[];
+  relations: Array<{
+    from: string;
+    to: string;
+    fields: string[];
+    references: string[];
+  }>;
+}
+
 /**
  * A detected database connection.
  */
@@ -44,6 +71,8 @@ export interface DatabaseInfo {
   orm?: "prisma" | "typeorm" | "sequelize" | "mongoose" | "drizzle" | "none";
   /** Schema file path if detected */
   schemaFile?: string;
+  /** Extracted Prisma schema metadata */
+  prismaSchema?: PrismaSchemaInfo;
 }
 
 /**
@@ -85,6 +114,10 @@ export interface WorkspaceFacts {
   auth: AuthInfo[];
   envVars: EnvVar[];
   infra: InfraInfo;
+  packageManager?: string;
+  packageScripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 }
 
 /**
@@ -108,6 +141,11 @@ export interface RepoFacts {
   auth: AuthInfo[];
   envVars: EnvVar[];
   infra: InfraInfo;
+
+  packageManager?: string;
+  packageScripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
 
   /** Detected folder structure (first 3 levels, no file contents) */
   folderStructure: FolderNode[];
@@ -144,24 +182,12 @@ export type JobStatus =
   | "skipped";
 
 export interface AnalysisJobPayload {
-  /** Database AnalysisJob ID */
   jobId: string;
-  /** GitHub webhook delivery ID for idempotency */
-  webhookDeliveryId: string;
-  /** Repository DB id */
   repositoryId: string;
-  /** GitHub App installation ID */
-  installationId: number;
-  /** Repository full name: "owner/repo" */
+  userId: string;
   repoFullName: string;
-  /** Branch that was pushed to */
   branch: string;
-  /** Commit SHA before the push */
-  beforeSha: string;
-  /** Commit SHA after the push (HEAD) */
-  afterSha: string;
-  /** Files changed in this push (from webhook payload) */
-  changedFiles: string[];
+  commitSha: string;
 }
 
 // ─── AI Output Types ──────────────────────────────────────────────────────────

@@ -1,69 +1,64 @@
-# DocFlow AI
+# DocFlow AI 📚
 
-> **Automated Repository Documentation & Intelligence Platform** — the "Vercel for Documentation" that keeps your READMEs and technical docs automatically up to date whenever you push code.
+> **Automated Repository Documentation & Intelligence Platform** — the "Vercel for Documentation" that analyzes your codebase architecture and generates professional, senior-engineer quality README files using local or hosted AI models.
 
-[![CI](https://github.com/your-org/docflow-ai/actions/workflows/ci.yml/badge.svg)](https://github.com/your-org/docflow-ai/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![pnpm](https://img.shields.io/badge/maintained%20with-pnpm-cc00ff.svg)](https://pnpm.io/)
 
 ---
 
-## How It Works
+## ⚡ How It Works
 
 ```
-Git Push → GitHub Webhook → Queue → Parser (AST/regex, zero AI)
-    → Structured JSON Facts → AI (only sees facts, never raw code)
-    → Validated Markdown → Surgical README Patch → PR
+OAuth Log In → Select Repository → Trigger Analysis (Shallow Clone)
+    → Parser Engine (AST/regex analysis, zero AI) → Structured JSON Facts
+    → AI Generator (only sees facts, never raw code) → Rich Live Editor (Markdown split-view)
+    → Push to GitHub (Direct Commit or Pull Request)
 ```
 
 **Parser-First Architecture** — raw source code **never** enters the LLM context window. This provides:
-- ✅ Prompt-injection resistance (malicious code comments can't influence generation)
-- ✅ Faster, cheaper AI calls (structured JSON is tiny vs full source)
-- ✅ Fully deterministic fallback (generates docs without any LLM)
+- ✅ **Prompt-Injection Resistance**: Malicious code comments cannot influence the AI prompt.
+- ✅ **Low Context Usage**: Small structured JSON facts instead of huge codebases.
+- ✅ **Deterministic Fallback**: Generates documentation even if AI providers are rate-limited or down.
 
 ---
 
-## Features
+## ✨ Features
 
-- 🔄 **Auto-synced docs** on every push to your tracked branch
-- 🧠 **AST-powered parser** detects frameworks, routes, DBs, auth, env vars, infra
-- 🤖 **Pluggable AI** — Groq (free tier), Gemini (free tier), or local Ollama
-- 🔒 **Prompt-injection safe** — only structured JSON facts reach the model
-- 📝 **Surgical README edits** — only changed sections are updated; your custom prose is preserved
-- 🏗️ **Monorepo-aware** — generates per-workspace docs + root overview
-- 🔁 **Resilient** — AI down? Falls back to deterministic template generation
-- ⚡ **Zero cost** to run — built on free tiers and OSS
+- 🔄 **Continue with GitHub** — One-click GitHub OAuth authentication with secure, encrypted tokens.
+- 🧠 **AST-Powered Parser** — Auto-detects frameworks, routes, databases, authentication, environment variables, and Docker configurations.
+- 🤖 **Pluggable AI** — Groq (hosted), Gemini (hosted), or local Ollama (`qwen2.5-coder:7b`).
+- 📝 **Split-View Live Editor** — Real-time markdown rendering with Undo/Redo buffers and local draft autosave.
+- 🚀 **Commit & PR Workflow** — Push generated docs directly to a target branch or open a Pull Request directly from the UI.
+- 🏗️ **Monorepo-Aware** — Supports monorepo workspaces and projects natively.
 
 ---
 
-## Monorepo Structure
+## 📂 Project Structure
 
 ```
 docflow-ai/
 ├── apps/
-│   └── frontend/          # Next.js dashboard
+│   └── web/               # Next.js SaaS Web App (Dashboard, Editor, API Routes)
 ├── packages/
-│   ├── shared/            # Types, interfaces, utilities
-│   ├── database/          # Prisma schema + migrations
-│   ├── parser/            # AST/regex fact extraction (no AI)
-│   ├── ai/                # Provider-agnostic LLM integration
-│   ├── queue/             # BullMQ + Redis job queue
-│   ├── github/            # Probot GitHub App (webhooks, git ops)
-│   ├── worker/            # Analysis pipeline orchestrator
-│   └── backend/           # Express REST API
-├── docker-compose.yml     # Local Postgres + Redis
-├── turbo.json             # Turborepo pipeline
+│   ├── shared/            # Common TypeScript interfaces & utilities
+│   ├── database/          # Prisma schema + PostgreSQL Client
+│   ├── parser/            # AST/regex codebase fact extractor (no AI)
+│   ├── ai/                # Provider-agnostic LLM integration & prompt generator
+│   └── queue/             # BullMQ + Redis job queue definitions
+├── docker-compose.yml     # Local Postgres + Redis services
+├── turbo.json             # Turborepo task pipeline
 └── pnpm-workspace.yaml
 ```
 
 ---
 
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Node.js ≥ 20
-- pnpm ≥ 9 (`npm install -g pnpm`)
+- pnpm ≥ 9
 - Docker & Docker Compose (for local Postgres + Redis)
 
 ### 1. Clone & Install
@@ -76,120 +71,62 @@ pnpm install
 
 ### 2. Configure Environment
 
+Copy the example environment file:
 ```bash
 cp .env.example .env
-# Edit .env and fill in required values (see comments in the file)
 ```
 
-**Required values:**
-- `DATABASE_URL` — PostgreSQL URL (free: [Neon](https://neon.tech) or [Supabase](https://supabase.com))
-- `REDIS_URL` — Redis URL (free: [Upstash](https://upstash.com))
-- `GROQ_API_KEY` — Free at [console.groq.com](https://console.groq.com)
-- `GITHUB_APP_ID`, `GITHUB_PRIVATE_KEY`, `GITHUB_WEBHOOK_SECRET` — [Setup guide](docs/GITHUB_APP_SETUP.md)
-- `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET` — GitHub OAuth App
-- `NEXTAUTH_SECRET` — `openssl rand -base64 32`
+And configure:
+- `DATABASE_URL` — PostgreSQL connection string.
+- `REDIS_URL` — Redis connection string.
+- `ENCRYPTION_KEY` — 32-byte hex key for securing GitHub OAuth tokens (AES-256-GCM).
+- `GITHUB_CLIENT_ID` & `GITHUB_CLIENT_SECRET` — From your GitHub OAuth application.
+- `NEXTAUTH_SECRET` & `NEXTAUTH_URL` — NextAuth credentials.
+- `AI_PROVIDER` — `ollama`, `groq`, or `gemini`.
 
-### 3. Start Local Infrastructure
+### 3. Start Infrastructure
 
+Spin up local Postgres and Redis databases:
 ```bash
 docker compose up -d
 ```
 
-### 4. Database Setup
-
+Push the database schema:
 ```bash
-pnpm db:generate   # Generate Prisma client
-pnpm db:migrate    # Run migrations
+pnpm --filter @docflow/database db:push
 ```
 
-### 5. Start Development Servers
+### 4. Run Development Servers
 
 ```bash
 pnpm dev
 ```
 
 This starts:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:4000
-- GitHub webhook receiver: http://localhost:4001
-
-For local GitHub webhook testing, use [smee.io](https://smee.io):
-```bash
-npx smee-client --url https://smee.io/your-channel --target http://localhost:4001/api/github/webhooks
-```
+- **Next.js Web App**: http://localhost:3000
+- **BullMQ Background Worker**: Asynchronously executes clones and static analyses.
 
 ---
 
-## Tech Stack
+## 🛠 Tech Stack
 
-| Layer | Technology | Why Free |
-|---|---|---|
-| Frontend | Next.js + Tailwind CSS | Vercel free tier |
-| Backend API | Node.js + Express | Self-hostable |
-| Database | PostgreSQL + Prisma | Neon/Supabase free tier |
-| Queue | BullMQ + Redis | Upstash free tier |
-| AI (hosted) | Groq free tier (Llama 3) | 14,400 tokens/min free |
-| AI (local) | Ollama + Qwen/DeepSeek | Self-hosted |
-| Parsing | web-tree-sitter + ts-morph | OSS |
-| GitHub | Probot framework | OSS + GitHub App free |
-| Auth | NextAuth.js + GitHub OAuth | OSS |
+| Layer | Technology |
+|---|---|
+| **Frontend/SaaS App** | Next.js 14 + Tailwind CSS + Framer Motion |
+| **Authentication** | NextAuth.js + GitHub OAuth |
+| **Database** | PostgreSQL + Prisma ORM |
+| **Task Queue** | BullMQ + Redis |
+| **Parsing** | web-tree-sitter + ts-morph |
+| **AI Integration** | Ollama (local) / Groq & Gemini (hosted) |
 
 ---
 
-## Supported Languages & Frameworks
+## 🛡 Security & Token Protection
 
-| Language | Framework Detection | Route Detection |
-|---|---|---|
-| JavaScript/TypeScript | Express, Next.js, NestJS, Fastify | ✅ AST |
-| Python | FastAPI, Flask, Django | ✅ AST |
-| Java | Spring Boot | ✅ AST |
-| Go | Gin, Fiber, Echo | ✅ AST |
-| Rust | Actix, Rocket | ✅ Regex |
-| Any | Folder structure, env vars, infra | ✅ Fallback |
+All user access tokens are encrypted using **AES-256-GCM** before being persisted in the database. Tokens are never exposed in the client-side session JWT; decryption only occurs on the secure backend during git operations (cloning, committing, and opening PRs).
 
 ---
 
-## AI Providers
+## 📝 License
 
-Configure via the `AI_PROVIDER` environment variable:
-
-```bash
-AI_PROVIDER=groq    # Default — Groq free tier (best throughput)
-AI_PROVIDER=gemini  # Gemini free tier
-AI_PROVIDER=ollama  # Local Ollama (fully self-hosted)
-```
-
-If the AI provider is unavailable or rate-limited, DocFlow AI automatically falls back to a deterministic template engine that generates a complete README from parsed facts alone.
-
----
-
-## Architecture
-
-```mermaid
-graph TD
-    A[Git Push] --> B[GitHub Webhook]
-    B --> C{Probot App\nVerify & Dedup}
-    C --> D[BullMQ Job Queue]
-    D --> E[Worker: Shallow Clone]
-    E --> F[Parser Engine\nAST/Regex - No AI]
-    F --> G[Structured JSON Facts]
-    G --> H{Merge with\nCached Facts}
-    H --> I[AI Module\ngenerateDocsOrFacts]
-    I --> J[Validated Markdown]
-    J --> K[mdast README Patcher]
-    K --> L[Git Commit on Bot Branch]
-    L --> M[Open PR]
-
-    I -. rate limited .-> N[Deterministic\nFallback Template]
-    N --> J
-```
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development guidelines.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Distributed under the MIT License. See `LICENSE` for more information.

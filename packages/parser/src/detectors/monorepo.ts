@@ -74,6 +74,35 @@ export async function detectMonorepo(repoPath: string): Promise<MonorepoInfo> {
     }
   }
 
+  // ── Custom / Multi-Service Scan Fallback ──────────────────────────────────
+  if (workspacePaths.length === 0) {
+    try {
+      const entries = fs.readdirSync(repoPath, { withFileTypes: true });
+      for (const entry of entries) {
+        if (entry.isDirectory() && !entry.name.startsWith(".") && entry.name !== "node_modules") {
+          const subDirPath = path.join(repoPath, entry.name);
+          const manifests = [
+            "package.json",
+            "requirements.txt",
+            "go.mod",
+            "Cargo.toml",
+            "pom.xml",
+            "build.gradle",
+            "Gemfile",
+            "tsconfig.json",
+            "package-lock.json"
+          ];
+          const hasManifest = manifests.some((m) => fs.existsSync(path.join(subDirPath, m)));
+          if (hasManifest) {
+            workspacePaths.push(entry.name);
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   return {
     isMonorepo: workspacePaths.length > 0,
     workspacePaths: [...new Set(workspacePaths)],
